@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Disaster Relief & Resource Management{% endblock %}
+{% block breadcrumb %}Emergency Operations Command{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>🚨 Operations Dashboard</h1>
+    <p>Live situational overview of active disaster zones, resource stockpiles, and ongoing relief distribution.</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('relief_requests') }}" class="btn btn-secondary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      New Request
+    </a>
+    <a href="{{ url_for('disasters') }}" class="btn btn-primary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      Report Disaster
+    </a>
+  </div>
+</div>
+
+<!-- Primary Metric Cards -->
+<div class="metrics-grid">
+  <!-- Metric 1: Total Resources -->
+  <div class="metric-card" style="--card-accent: #3b82f6;">
+    <div class="metric-header">
+      <span class="metric-title">Total Resources</span>
+      <div class="metric-icon-wrap">📦</div>
+    </div>
+    <div class="metric-value">{{ "{:,}".format(metrics.total_resources) }}</div>
+    <div class="metric-footer">
+      <span>Available across all storage depots</span>
+    </div>
+  </div>
+
+  <!-- Metric 2: Active Disasters -->
+  <div class="metric-card" style="--card-accent: #ef4444;">
+    <div class="metric-header">
+      <span class="metric-title">Active Disasters</span>
+      <div class="metric-icon-wrap">🔥</div>
+    </div>
+    <div class="metric-value" style="color: #f87171;">{{ metrics.active_disasters }}</div>
+    <div class="metric-footer">
+      <span>Affecting ~{{ "{:,}".format(metrics.total_affected_population) }} citizens</span>
+    </div>
+  </div>
+
+  <!-- Metric 3: Pending Requests -->
+  <div class="metric-card" style="--card-accent: #f59e0b;">
+    <div class="metric-header">
+      <span class="metric-title">Pending Requests</span>
+      <div class="metric-icon-wrap">⏳</div>
+    </div>
+    <div class="metric-value" style="color: #fbbf24;">{{ metrics.pending_requests }}</div>
+    <div class="metric-footer">
+      <span>Awaiting stock allocation & approval</span>
+    </div>
+  </div>
+
+  <!-- Metric 4: Distributed Resources -->
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Distributed Aid</span>
+      <div class="metric-icon-wrap">🚚</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ "{:,}".format(metrics.total_distributed) }}</div>
+    <div class="metric-footer">
+      <span>Units dispatched to relief centers</span>
+    </div>
+  </div>
+</div>
+
+<!-- Main Split Layout -->
+<div class="dashboard-columns">
+  <!-- Left Side: Tables -->
+  <div class="col-main">
+    <!-- Active Disasters Overview Panel -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span>⚠️</span> Active Disasters & Affected Zones
+        </h2>
+        <a href="{{ url_for('disasters') }}" class="btn btn-secondary btn-sm">View All Zones &rarr;</a>
+      </div>
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Incident</th>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Severity</th>
+              <th>Population</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in disasters %}
+            <tr>
+              <td><strong>{{ d.title }}</strong></td>
+              <td><span class="category-pill">{{ d.type }}</span></td>
+              <td>{{ d.location }}</td>
+              <td>
+                <span class="badge badge-{{ d.severity | lower }}">
+                  {{ d.severity }}
+                </span>
+              </td>
+              <td>{{ "{:,}".format(d.affected_population) }}</td>
+              <td>
+                <span class="badge badge-{{ d.status | lower }}">
+                  {{ d.status }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 24px;">No active disaster records found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Relief Requests Panel -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span>📋</span> Recent Relief Aid Requests
+        </h2>
+        <a href="{{ url_for('relief_requests') }}" class="btn btn-secondary btn-sm">Manage Requests &rarr;</a>
+      </div>
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Requester</th>
+              <th>Disaster Zone</th>
+              <th>Supplies Needed</th>
+              <th>Urgency</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for req in requests %}
+            <tr>
+              <td><strong>#{{ req.id }}</strong></td>
+              <td>
+                <div>{{ req.requester_name }}</div>
+                <div style="font-size: 11px; color: var(--text-dim);">{{ req.contact_number }}</div>
+              </td>
+              <td>{{ req.location }}</td>
+              <td>
+                <strong>{{ req.quantity }}</strong> {{ req.unit }} ({{ req.item_name }})
+              </td>
+              <td>
+                <span class="badge badge-{{ req.urgency | lower }}">{{ req.urgency }}</span>
+              </td>
+              <td>
+                <span class="badge badge-{{ req.status | lower }}">{{ req.status }}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-dim); padding: 24px;">No requests submitted yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Side: Inventory Breakdown & Low Stock Warning -->
+  <div class="col-side">
+    <!-- Critical Stock Alerts -->
+    <div class="panel-card" style="border-top: 3px solid #ef4444;">
+      <div class="panel-header">
+        <h2 class="panel-title" style="color: #f87171;">
+          <span>🚨</span> Low Stock Alerts ({{ low_stock_items | length }})
+        </h2>
+      </div>
+      <div class="panel-body" style="padding-top: 10px;">
+        {% if low_stock_items %}
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            {% for item in low_stock_items %}
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); padding: 12px; border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <strong style="color: #fca5a5; font-size: 14px;">{{ item.item_name }}</strong>
+                <span class="badge badge-critical">Critical</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between;">
+                <span>Stock: <strong style="color: #ffffff;">{{ item.quantity }} {{ item.unit }}</strong></span>
+                <span>Threshold: {{ item.threshold }} {{ item.unit }}</span>
+              </div>
+              <div class="stock-bar-wrap">
+                {% set pct = (item.quantity / item.threshold * 50) | round | int %}
+                <div class="stock-bar critical" style="width: {{ pct if pct <= 100 else 100 }}%;"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div style="margin-top: 16px;">
+            <a href="{{ url_for('inventory') }}" class="btn btn-primary" style="width: 100%; font-size: 12px;">Restock Inventory Now</a>
+          </div>
+        {% else %}
+          <div style="text-align: center; color: #10b981; padding: 20px 0;">
+            <div style="font-size: 28px; margin-bottom: 6px;">✅</div>
+            <strong>All supplies above safety thresholds.</strong>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">No immediate shortages detected.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Inventory Category Overview -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <h2 class="panel-title">
+          <span>📦</span> Stock by Category
+        </h2>
+      </div>
+      <div class="panel-body">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          {% for cat in category_summary %}
+          <div>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+              <span style="font-weight: 600; color: #ffffff;">{{ cat.category }}</span>
+              <span style="color: var(--text-muted);">{{ "{:,}".format(cat.total_qty) }} units ({{ cat.item_count }} items)</span>
+            </div>
+            <div class="stock-bar-wrap">
+              <div class="stock-bar" style="width: 75%;"></div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div style="margin-top: 20px;">
+          <a href="{{ url_for('inventory') }}" class="btn btn-secondary" style="width: 100%; font-size: 12px;">Manage Full Inventory</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
