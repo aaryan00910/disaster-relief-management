@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+
+{% block title %}Relief Requests & Resource Allocation | Disaster Relief{% endblock %}
+{% block breadcrumb %}Relief Aid Requests & Allocation{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>📋 Relief Requests & Resource Allocation</h1>
+    <p>Review aid requests from ground volunteers and automatically allocate inventory supplies with live stock deduction.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openModal('addRequestModal')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Submit Aid Request
+    </button>
+  </div>
+</div>
+
+<!-- Requests Stats Cards -->
+<div class="metrics-grid">
+  <div class="metric-card" style="--card-accent: #f59e0b;">
+    <div class="metric-header">
+      <span class="metric-title">Pending Decisions</span>
+      <div class="metric-icon-wrap">⏳</div>
+    </div>
+    <div class="metric-value" style="color: #fbbf24;">{{ pending_count }}</div>
+    <div class="metric-footer">Awaiting evaluation & inventory check</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Fulfilled / Allocated</span>
+      <div class="metric-icon-wrap">✅</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ allocated_count }}</div>
+    <div class="metric-footer">Successfully dispatched supplies</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #3b82f6;">
+    <div class="metric-header">
+      <span class="metric-title">Total Requests Logged</span>
+      <div class="metric-icon-wrap">📄</div>
+    </div>
+    <div class="metric-value">{{ requests | length }}</div>
+    <div class="metric-footer">Lifetime emergency requests</div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('relief_requests') }}" style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <select name="status" class="form-control" style="width: auto; padding: 6px 12px;" onchange="this.form.submit()">
+      <option value="All" {% if selected_status == 'All' %}selected{% endif %}>All Statuses</option>
+      <option value="Pending" {% if selected_status == 'Pending' %}selected{% endif %}>Pending</option>
+      <option value="Approved" {% if selected_status == 'Approved' %}selected{% endif %}>Approved</option>
+      <option value="Allocated" {% if selected_status == 'Allocated' %}selected{% endif %}>Allocated (Dispatched)</option>
+      <option value="Rejected" {% if selected_status == 'Rejected' %}selected{% endif %}>Rejected</option>
+    </select>
+
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    {% if selected_status != 'All' %}
+      <a href="{{ url_for('relief_requests') }}" class="btn btn-secondary btn-sm">Reset</a>
+    {% endif %}
+  </form>
+
+  <div class="search-box">
+    <span>⚡</span>
+    <input type="text" id="clientTableSearch" placeholder="Filter requests by name, location...">
+  </div>
+</div>
+
+<!-- Requests Table Panel -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>📥</span> Relief Aid Queue
+    </h2>
+    <span style="font-size: 13px; color: var(--text-muted);">{{ requests | length }} requests in view</span>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table filterable-table">
+      <thead>
+        <tr>
+          <th>Req ID</th>
+          <th>Requester & Contact</th>
+          <th>Target Zone / Camp</th>
+          <th>Supplies Requested</th>
+          <th>Stock In Warehouse</th>
+          <th>Urgency</th>
+          <th>Status</th>
+          <th style="text-align: right;">Action Operations</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for req in requests %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff;">#{{ req.id }}</strong>
+            <div style="font-size: 11px; color: var(--text-dim);">{{ req.request_date }}</div>
+          </td>
+          <td>
+            <strong style="color: #ffffff;">{{ req.requester_name }}</strong>
+            <div style="font-size: 12px; color: var(--text-dim);">📞 {{ req.contact_number }}</div>
+          </td>
+          <td>
+            <div>{{ req.location }}</div>
+            {% if req.disaster_title %}
+              <div style="font-size: 11px; color: var(--accent-red);">Incident: {{ req.disaster_title }}</div>
+            {% endif %}
+          </td>
+          <td>
+            <span style="font-size: 15px; font-weight: 700; color: #ffffff;">{{ req.quantity }}</span>
+            <span style="font-size: 13px; color: var(--text-muted);">{{ req.unit }}</span>
+            <div style="font-size: 12px; color: #94a3b8;">{{ req.item_name }}</div>
+          </td>
+          <td>
+            {% if req.stock_available is not none %}
+              {% if req.stock_available >= req.quantity %}
+                <span style="color: #34d399; font-weight: 600;">{{ req.stock_available }} {{ req.unit }} (Available)</span>
+              {% else %}
+                <span style="color: #f87171; font-weight: 600;">{{ req.stock_available }} {{ req.unit }} (Deficit!)</span>
+              {% endif %}
+            {% else %}
+              <span style="color: var(--text-dim);">Item Removed</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-{{ req.urgency | lower }}">{{ req.urgency }}</span>
+          </td>
+          <td>
+            <span class="badge badge-{{ req.status | lower }}">{{ req.status }}</span>
+          </td>
+          <td style="text-align: right;">
+            <div style="display: inline-flex; gap: 6px; align-items: center;">
+              {% if req.status == 'Pending' or req.status == 'Approved' %}
+                <!-- Allocate Button -->
+                <button 
+                  class="btn btn-success btn-sm"
+                  onclick="openAllocateModal(
+                    {{ req.id }},
+                    '{{ req.requester_name | replace("'", "\\'") }}',
+                    '{{ req.item_name | replace("'", "\\'") }}',
+                    {{ req.quantity }},
+                    '{{ req.unit }}',
+                    {{ req.stock_available if req.stock_available is not none else 0 }}
+                  )"
+                  title="Allocate & Deduct Inventory Stock"
+                >
+                  🚚 Allocate Stock
+                </button>
+
+                {% if req.status == 'Pending' %}
+                  <!-- Approve Button -->
+                  <form method="POST" action="{{ url_for('update_request_status', req_id=req.id, new_status='Approved') }}" style="display: inline;">
+                    <button type="submit" class="btn btn-secondary btn-sm" title="Approve Request">
+                      ✓ Approve
+                    </button>
+                  </form>
+                {% endif %}
+
+                <!-- Reject Button -->
+                <form method="POST" action="{{ url_for('update_request_status', req_id=req.id, new_status='Rejected') }}" onsubmit="return confirm('Reject this relief request?');" style="display: inline;">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Reject Request">
+                    ✕
+                  </button>
+                </form>
+              {% elif req.status == 'Allocated' %}
+                <span style="font-size: 12px; color: #34d399; font-weight: 600;">✓ Dispatched</span>
+              {% else %}
+                <span style="font-size: 12px; color: var(--text-dim);">Closed</span>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 32px;">
+            No relief requests found for this filter.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal 1: Submit Aid Request -->
+<div class="modal-overlay" id="addRequestModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📋 Submit Relief Aid Request</h3>
+      <button class="modal-close" onclick="closeModal('addRequestModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_request') }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Requester / Camp Leader Name *</label>
+            <input type="text" name="requester_name" class="form-control" placeholder="e.g. Captain Ananya Das" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Phone Number *</label>
+            <input type="text" name="contact_number" class="form-control" placeholder="e.g. +91 98765 01234" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Linked Disaster Incident (Optional)</label>
+          <select name="disaster_id" class="form-control">
+            <option value="">-- General Relief / Unassigned Zone --</option>
+            {% for d in active_disasters %}
+              <option value="{{ d.id }}">{{ d.title }} ({{ d.location }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Specific Delivery Camp / Location *</label>
+          <input type="text" name="location" class="form-control" placeholder="e.g. Sector 4 Relief Camp, Tent Block C" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Required Supply Item *</label>
+            <select name="item_id" class="form-control" required>
+              <option value="">-- Select Inventory Item --</option>
+              {% for itm in inventory_items %}
+                <option value="{{ itm.id }}">{{ itm.item_name }} (Available: {{ itm.quantity }} {{ itm.unit }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity Needed *</label>
+            <input type="number" name="quantity" class="form-control" min="1" value="100" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Urgency Level *</label>
+          <select name="urgency" class="form-control" required>
+            <option value="Critical">Critical (Immediate life-safety risk)</option>
+            <option value="High" selected>High (Needed within 24 hours)</option>
+            <option value="Normal">Normal (Standard relief buffer)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Operational Notes / Special Instructions</label>
+          <textarea name="notes" class="form-control" placeholder="State road condition, accessibility, or specific community needs..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addRequestModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Submit Request</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Allocate Resources Modal -->
+<div class="modal-overlay" id="allocateModal">
+  <div class="modal-box">
+    <div class="modal-header" style="border-top-color: #10b981;">
+      <h3 style="color: #34d399;">🚚 Allocate & Dispatch Relief Supplies</h3>
+      <button class="modal-close" onclick="closeModal('allocateModal')">&times;</button>
+    </div>
+    <form id="allocateForm" method="POST" action="">
+      <div class="modal-body">
+        <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 16px;">
+          Fulfilling this request will automatically subtract the required units from the warehouse inventory and register a distribution audit record.
+        </p>
+
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-dim); font-size: 13px;">Request:</span>
+            <strong id="alloc_req_id" style="color: #ffffff;"></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-dim); font-size: 13px;">Requester:</span>
+            <span id="alloc_requester" style="color: #ffffff;"></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: var(--text-dim); font-size: 13px;">Item Needed:</span>
+            <strong id="alloc_item" style="color: #fca5a5;"></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-dim); font-size: 13px;">Warehouse Stock:</span>
+            <strong id="alloc_stock" style="color: #34d399;"></strong>
+          </div>
+        </div>
+
+        <div id="alloc_stock_warning" style="display: none; padding: 10px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; color: #f87171; font-size: 13px; margin-bottom: 16px;"></div>
+
+        <div class="form-group">
+          <label class="form-label">Dispatching Logistics Officer Name *</label>
+          <input type="text" name="officer_name" class="form-control" value="Officer R. Sharma (HQ)" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dispatch Remarks / Vehicle Details</label>
+          <input type="text" name="remarks" class="form-control" value="Dispatched via emergency truck convoys.">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('allocateModal')">Cancel</button>
+        <button type="submit" id="alloc_submit_btn" class="btn btn-success">Confirm Allocation & Dispatch</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}Distribution History & Logistics Audit | Disaster Relief{% endblock %}
+{% block breadcrumb %}Relief Aid Distribution Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>🚚 Distribution History & Audit Trail</h1>
+    <p>Complete audit ledger of emergency relief consignments dispatched to affected communities and camps.</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('export_distribution_csv') }}" class="btn btn-secondary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      Export CSV Report
+    </a>
+    <button class="btn btn-secondary" onclick="window.print()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+      Print Log
+    </button>
+    <button class="btn btn-primary" onclick="openModal('addDistributionModal')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Log Direct Dispatch
+    </button>
+  </div>
+</div>
+
+<!-- Key Distribution Stats -->
+<div class="metrics-grid">
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Total Dispatches Completed</span>
+      <div class="metric-icon-wrap">🚚</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ total_distributions }}</div>
+    <div class="metric-footer">Official aid consignments delivered</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #3b82f6;">
+    <div class="metric-header">
+      <span class="metric-title">Total Units Delivered</span>
+      <div class="metric-icon-wrap">📦</div>
+    </div>
+    <div class="metric-value">{{ "{:,}".format(total_items_distributed) }}</div>
+    <div class="metric-footer">Across all relief categories</div>
+  </div>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('distribution') }}" style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" name="search" placeholder="Search by item, camp, or officer..." value="{{ search_query }}">
+    </div>
+    <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+    {% if search_query %}
+      <a href="{{ url_for('distribution') }}" class="btn btn-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+
+  <div class="search-box">
+    <span>⚡</span>
+    <input type="text" id="clientTableSearch" placeholder="Fast client search...">
+  </div>
+</div>
+
+<!-- Distribution Audit Log Table -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>📜</span> Completed Consignments Ledger
+    </h2>
+    <span style="font-size: 13px; color: var(--text-muted);">{{ distributions | length }} records verified</span>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table filterable-table">
+      <thead>
+        <tr>
+          <th>Dispatch #</th>
+          <th>Date & Time</th>
+          <th>Relief Item Supplied</th>
+          <th>Quantity Dispatched</th>
+          <th>Destination / Relief Camp</th>
+          <th>Disaster Incident</th>
+          <th>Logistics Officer</th>
+          <th>Remarks / Proof</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for dist in distributions %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff;">#{{ dist.id }}</strong>
+            {% if dist.request_id %}
+              <div style="font-size: 11px; color: var(--accent-blue);">Req #{{ dist.request_id }}</div>
+            {% else %}
+              <div style="font-size: 11px; color: var(--text-dim);">Direct Dispatch</div>
+            {% endif %}
+          </td>
+          <td style="font-size: 13px; color: #cbd5e1; white-space: nowrap;">{{ dist.distribution_date }}</td>
+          <td>
+            <strong style="color: #ffffff;">{{ dist.item_name }}</strong>
+          </td>
+          <td>
+            <span style="font-size: 15px; font-weight: 700; color: #34d399;">{{ "{:,}".format(dist.quantity) }}</span>
+            <span style="font-size: 12px; color: var(--text-muted);">{{ dist.unit }}</span>
+          </td>
+          <td>
+            <span style="color: #cbd5e1;">📍 {{ dist.recipient_area }}</span>
+          </td>
+          <td>
+            {% if dist.disaster_title %}
+              <span class="category-pill">{{ dist.disaster_title }}</span>
+            {% else %}
+              <span style="font-size: 12px; color: var(--text-dim);">General Emergency</span>
+            {% endif %}
+          </td>
+          <td>
+            <div style="font-weight: 600; color: #ffffff;">{{ dist.officer_name }}</div>
+          </td>
+          <td style="font-size: 12px; color: var(--text-muted); max-width: 220px; white-space: normal;">
+            {{ dist.remarks or 'Consignment verified and signed off.' }}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 32px;">
+            No distribution entries found. Fulfill a relief request or log a direct dispatch to populate this ledger.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal: Direct Dispatch -->
+<div class="modal-overlay" id="addDistributionModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🚚 Log Direct Relief Dispatch</h3>
+      <button class="modal-close" onclick="closeModal('addDistributionModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_distribution') }}">
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Use direct dispatch when delivering emergency supplies directly to a disaster zone without a pre-filed request ticket.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Supply Item To Dispatch *</label>
+          <select name="item_id" class="form-control" required>
+            <option value="">-- Select Available Item --</option>
+            {% for item in inventory_items %}
+              <option value="{{ item.id }}">{{ item.item_name }} (Stock: {{ item.quantity }} {{ item.unit }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Quantity To Dispatch *</label>
+            <input type="number" name="quantity" class="form-control" min="1" value="50" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Associated Disaster Incident</label>
+            <select name="disaster_id" class="form-control">
+              <option value="">-- General / Unassigned Emergency --</option>
+              {% for d in disasters %}
+                <option value="{{ d.id }}">{{ d.title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Recipient Area / Shelter Camp *</label>
+          <input type="text" name="recipient_area" class="form-control" placeholder="e.g. Red Cross Emergency Medical Tent, Sector 3" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Supervising Logistics Officer *</label>
+          <input type="text" name="officer_name" class="form-control" placeholder="e.g. Officer K. Patel" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dispatch Remarks / Vehicle Consignment ID</label>
+          <textarea name="remarks" class="form-control" placeholder="e.g. Convoy #4 delivered to Field Hospital lead Dr. Roy"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addDistributionModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Dispatch & Deduct Stock</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

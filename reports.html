@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+
+{% block title %}Operational Reports & Strategic Analytics | Disaster Relief{% endblock %}
+{% block breadcrumb %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>📊 Strategic Reports & Impact Analytics</h1>
+    <p>Comprehensive audit breakdown of disaster severity, inventory buffer capacity, and humanitarian aid distribution.</p>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('export_distribution_csv') }}" class="btn btn-secondary">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      Export CSV Log
+    </a>
+    <button class="btn btn-primary" onclick="window.print()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+      Print Executive Report
+    </button>
+  </div>
+</div>
+
+<!-- Report Generated Timestamp -->
+<div style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+  Report Generated on: <strong style="color: #ffffff;">{{ generated_at }}</strong> | System Authority: National Disaster Relief Operations Hub
+</div>
+
+<!-- Report KPI Cards -->
+<div class="metrics-grid">
+  <div class="metric-card" style="--card-accent: #3b82f6;">
+    <div class="metric-header">
+      <span class="metric-title">Available Supplies Stock</span>
+      <div class="metric-icon-wrap">📦</div>
+    </div>
+    <div class="metric-value">{{ "{:,}".format(metrics.total_resources) }}</div>
+    <div class="metric-footer">Units standing by in warehouses</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Supplies Dispatched</span>
+      <div class="metric-icon-wrap">🚚</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ "{:,}".format(metrics.total_distributed) }}</div>
+    <div class="metric-footer">Total units delivered to camps</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #ef4444;">
+    <div class="metric-header">
+      <span class="metric-title">Active Crisis Zones</span>
+      <div class="metric-icon-wrap">🔥</div>
+    </div>
+    <div class="metric-value" style="color: #f87171;">{{ metrics.active_disasters }}</div>
+    <div class="metric-footer">Under active emergency response</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #f59e0b;">
+    <div class="metric-header">
+      <span class="metric-title">Impacted Citizens</span>
+      <div class="metric-icon-wrap">👥</div>
+    </div>
+    <div class="metric-value" style="color: #fbbf24;">{{ "{:,}".format(metrics.total_affected_population) }}</div>
+    <div class="metric-footer">Estimated population in distress</div>
+  </div>
+</div>
+
+<!-- Section 1: Category-Wise Capacity Table -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>1️⃣</span> Inventory Capacity & Shortage Risk by Supply Category
+    </h2>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Supply Category</th>
+          <th>Distinct Items Registered</th>
+          <th>Total Units in Stock</th>
+          <th>Low Stock Warnings</th>
+          <th>Risk Assessment</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat in category_data %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff; font-size: 14px;">{{ cat.category }}</strong>
+          </td>
+          <td>{{ cat.item_types }} items</td>
+          <td>
+            <strong style="font-size: 15px; color: #ffffff;">{{ "{:,}".format(cat.total_units) }}</strong> units
+          </td>
+          <td>
+            {% if cat.low_stock_items > 0 %}
+              <span class="badge badge-critical">{{ cat.low_stock_items }} Item(s) Below Threshold</span>
+            {% else %}
+              <span class="badge badge-resolved">0 Warnings</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if cat.low_stock_items > 0 %}
+              <span style="color: #fca5a5; font-size: 13px;">⚠️ Restock procurement required</span>
+            {% else %}
+              <span style="color: #34d399; font-size: 13px;">✅ Stock levels adequate</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Section 2: Aid Distributed By Item -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>2️⃣</span> Consignment Distribution Volume by Resource Item
+    </h2>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Resource Item Description</th>
+          <th>Total Units Distributed</th>
+          <th>Dispatches / Deliveries</th>
+          <th>Unit of Measure</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in item_distributions %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff;">{{ item.item_name }}</strong>
+          </td>
+          <td>
+            <span style="font-size: 16px; font-weight: 700; color: #34d399;">
+              {{ "{:,}".format(item.total_distributed) }}
+            </span>
+          </td>
+          <td>{{ item.delivery_count }} consignments</td>
+          <td><span class="category-pill">{{ item.unit }}</span></td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4" style="text-align: center; color: var(--text-dim); padding: 24px;">No consignments recorded yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Section 3: Disasters & Demand Matrix -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>3️⃣</span> Disaster Zones Impact & Relief Demand Ledger
+    </h2>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Incident Title</th>
+          <th>Category</th>
+          <th>Affected Location</th>
+          <th>Severity</th>
+          <th>Impacted Population</th>
+          <th>Relief Requests Filed</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in disasters_summary %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff;">{{ d.title }}</strong>
+          </td>
+          <td><span class="category-pill">{{ d.type }}</span></td>
+          <td>📍 {{ d.location }}</td>
+          <td>
+            <span class="badge badge-{{ d.severity | lower }}">{{ d.severity }}</span>
+          </td>
+          <td><strong>{{ "{:,}".format(d.affected_population) }}</strong> citizens</td>
+          <td>
+            <strong style="color: #3b82f6;">{{ d.request_count }}</strong> requests
+          </td>
+          <td>
+            <span class="badge badge-{{ d.status | lower }}">{{ d.status }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

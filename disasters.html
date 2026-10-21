@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+
+{% block title %}Disaster Zones & Incident Command | Disaster Relief{% endblock %}
+{% block breadcrumb %}Disaster Zones Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>🚨 Disaster-Affected Areas Management</h1>
+    <p>Track critical incidents, impact zones, affected populations, and emergency operational statuses.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openModal('addDisasterModal')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Log New Disaster Incident
+    </button>
+  </div>
+</div>
+
+<!-- Key Crisis Metrics -->
+<div class="metrics-grid">
+  <div class="metric-card" style="--card-accent: #ef4444;">
+    <div class="metric-header">
+      <span class="metric-title">Active Emergency Zones</span>
+      <div class="metric-icon-wrap">🔥</div>
+    </div>
+    <div class="metric-value" style="color: #f87171;">{{ active_count }}</div>
+    <div class="metric-footer">Ongoing active crisis areas</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #f59e0b;">
+    <div class="metric-header">
+      <span class="metric-title">Total Citizens Impacted</span>
+      <div class="metric-icon-wrap">👥</div>
+    </div>
+    <div class="metric-value" style="color: #fbbf24;">{{ "{:,}".format(total_pop) }}</div>
+    <div class="metric-footer">Estimated across active zones</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Contained / Resolved</span>
+      <div class="metric-icon-wrap">🛡️</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ resolved_count }}</div>
+    <div class="metric-footer">Stabilized disaster operations</div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('disasters') }}" style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <select name="status" class="form-control" style="width: auto; padding: 6px 12px;" onchange="this.form.submit()">
+      <option value="All" {% if selected_status == 'All' %}selected{% endif %}>All Statuses</option>
+      <option value="Active" {% if selected_status == 'Active' %}selected{% endif %}>Active</option>
+      <option value="Resolved" {% if selected_status == 'Resolved' %}selected{% endif %}>Resolved</option>
+    </select>
+
+    <select name="severity" class="form-control" style="width: auto; padding: 6px 12px;" onchange="this.form.submit()">
+      <option value="All" {% if selected_severity == 'All' %}selected{% endif %}>All Severities</option>
+      <option value="Critical" {% if selected_severity == 'Critical' %}selected{% endif %}>Critical</option>
+      <option value="High" {% if selected_severity == 'High' %}selected{% endif %}>High</option>
+      <option value="Medium" {% if selected_severity == 'Medium' %}selected{% endif %}>Medium</option>
+      <option value="Low" {% if selected_severity == 'Low' %}selected{% endif %}>Low</option>
+    </select>
+
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    {% if selected_status != 'All' or selected_severity != 'All' %}
+      <a href="{{ url_for('disasters') }}" class="btn btn-secondary btn-sm">Reset</a>
+    {% endif %}
+  </form>
+
+  <div class="search-box">
+    <span>⚡</span>
+    <input type="text" id="clientTableSearch" placeholder="Filter disaster records...">
+  </div>
+</div>
+
+<!-- Disasters Table -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>🌐</span> Active Disaster Zones Directory
+    </h2>
+    <span style="font-size: 13px; color: var(--text-muted);">{{ disasters | length }} incidents registered</span>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table filterable-table">
+      <thead>
+        <tr>
+          <th>Incident Title</th>
+          <th>Disaster Type</th>
+          <th>Location / Sector</th>
+          <th>Severity Level</th>
+          <th>Affected Pop.</th>
+          <th>Status</th>
+          <th>Date Reported</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in disasters %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff; font-size: 14px;">{{ d.title }}</strong>
+            {% if d.notes %}
+              <div style="font-size: 12px; color: var(--text-dim); max-width: 250px; white-space: normal;">
+                {{ d.notes }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="category-pill">{{ d.type }}</span>
+          </td>
+          <td>
+            <span style="color: #cbd5e1;">📍 {{ d.location }}</span>
+          </td>
+          <td>
+            <span class="badge badge-{{ d.severity | lower }}">
+              {{ d.severity }}
+            </span>
+          </td>
+          <td>
+            <strong style="color: #ffffff;">{{ "{:,}".format(d.affected_population) }}</strong>
+          </td>
+          <td>
+            <span class="badge badge-{{ d.status | lower }}">
+              {{ d.status }}
+            </span>
+          </td>
+          <td style="font-size: 12px; color: var(--text-dim);">{{ d.date_reported }}</td>
+          <td style="text-align: right;">
+            <div style="display: inline-flex; gap: 8px;">
+              <button 
+                class="btn btn-secondary btn-sm"
+                onclick="populateEditDisaster(
+                  {{ d.id }},
+                  '{{ d.title | replace("'", "\\'") }}',
+                  '{{ d.type }}',
+                  '{{ d.location | replace("'", "\\'") }}',
+                  '{{ d.severity }}',
+                  {{ d.affected_population }},
+                  '{{ d.status }}',
+                  '{{ (d.notes or '') | replace("'", "\\'") }}'
+                )"
+                title="Edit Disaster Details"
+              >
+                ✏️ Edit
+              </button>
+
+              <form method="POST" action="{{ url_for('delete_disaster', disaster_id=d.id) }}" onsubmit="return confirm('Delete this disaster record?');" style="display: inline;">
+                <button type="submit" class="btn btn-danger btn-sm" title="Delete Incident">
+                  🗑️
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 32px;">
+            No disaster incidents match the current filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal 1: Add Disaster -->
+<div class="modal-overlay" id="addDisasterModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🚨 Register New Disaster Incident</h3>
+      <button class="modal-close" onclick="closeModal('addDisasterModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_disaster') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Incident Title *</label>
+          <input type="text" name="title" class="form-control" placeholder="e.g. Coastal Flood Alert - Phase 2" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Disaster Type *</label>
+            <select name="type" class="form-control" required>
+              <option value="Flood">Flood</option>
+              <option value="Earthquake">Earthquake</option>
+              <option value="Cyclone">Cyclone</option>
+              <option value="Landslide">Landslide</option>
+              <option value="Fire">Fire Outbreak</option>
+              <option value="Drought">Drought</option>
+              <option value="Other">Other Emergency</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Severity Level *</label>
+            <select name="severity" class="form-control" required>
+              <option value="Critical">Critical (Immediate Danger)</option>
+              <option value="High" selected>High (Major Impact)</option>
+              <option value="Medium">Medium (Moderate)</option>
+              <option value="Low">Low (Monitored)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Geographic Location / District *</label>
+          <input type="text" name="location" class="form-control" placeholder="e.g. Northern River Delta, Sector 7" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Estimated Affected Population *</label>
+            <input type="number" name="affected_population" class="form-control" min="0" value="5000" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status *</label>
+            <select name="status" class="form-control" required>
+              <option value="Active">Active Emergency</option>
+              <option value="Resolved">Resolved / Stabilized</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Situation Summary & Notes</label>
+          <textarea name="notes" class="form-control" placeholder="Describe damages, access barriers, urgent humanitarian needs..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addDisasterModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Disaster Record</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Edit Disaster -->
+<div class="modal-overlay" id="editDisasterModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Update Disaster Incident</h3>
+      <button class="modal-close" onclick="closeModal('editDisasterModal')">&times;</button>
+    </div>
+    <form id="editDisasterForm" method="POST" action="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Incident Title *</label>
+          <input type="text" id="edit_dis_title" name="title" class="form-control" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Disaster Type *</label>
+            <select id="edit_dis_type" name="type" class="form-control" required>
+              <option value="Flood">Flood</option>
+              <option value="Earthquake">Earthquake</option>
+              <option value="Cyclone">Cyclone</option>
+              <option value="Landslide">Landslide</option>
+              <option value="Fire">Fire Outbreak</option>
+              <option value="Drought">Drought</option>
+              <option value="Other">Other Emergency</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Severity Level *</label>
+            <select id="edit_dis_severity" name="severity" class="form-control" required>
+              <option value="Critical">Critical</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Location / District *</label>
+          <input type="text" id="edit_dis_location" name="location" class="form-control" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Affected Population *</label>
+            <input type="number" id="edit_dis_pop" name="affected_population" class="form-control" min="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status *</label>
+            <select id="edit_dis_status" name="status" class="form-control" required>
+              <option value="Active">Active Emergency</option>
+              <option value="Resolved">Resolved / Stabilized</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Situation Summary & Notes</label>
+          <textarea id="edit_dis_notes" name="notes" class="form-control"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editDisasterModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Disaster</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

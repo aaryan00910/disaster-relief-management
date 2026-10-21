@@ -1,0 +1,279 @@
+{% extends 'base.html' %}
+
+{% block title %}Resource Inventory | Disaster Relief System{% endblock %}
+{% block breadcrumb %}Emergency Supplies Inventory{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="header-title-box">
+    <h1>📦 Resource Inventory Management</h1>
+    <p>Track, manage, and monitor life-saving supplies across food, water, medical kits, clothes, and blankets.</p>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openModal('addInventoryModal')">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Add New Supply Item
+    </button>
+  </div>
+</div>
+
+<!-- Inventory Stats Row -->
+<div class="metrics-grid">
+  <div class="metric-card" style="--card-accent: #3b82f6;">
+    <div class="metric-header">
+      <span class="metric-title">Catalogued Items</span>
+      <div class="metric-icon-wrap">📋</div>
+    </div>
+    <div class="metric-value">{{ total_items_count }}</div>
+    <div class="metric-footer">Supply types registered</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #ef4444;">
+    <div class="metric-header">
+      <span class="metric-title">Low Stock Warnings</span>
+      <div class="metric-icon-wrap">⚠️</div>
+    </div>
+    <div class="metric-value" style="color: #f87171;">{{ low_stock_count }}</div>
+    <div class="metric-footer">Items below safe buffer limit</div>
+  </div>
+
+  <div class="metric-card" style="--card-accent: #10b981;">
+    <div class="metric-header">
+      <span class="metric-title">Total Units In Stock</span>
+      <div class="metric-icon-wrap">📊</div>
+    </div>
+    <div class="metric-value" style="color: #34d399;">{{ "{:,}".format(total_units_sum) }}</div>
+    <div class="metric-footer">Total packages, liters, & kits</div>
+  </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="filter-bar">
+  <form method="GET" action="{{ url_for('inventory') }}" style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="text" name="search" placeholder="Search item or depot location..." value="{{ search_query }}">
+    </div>
+
+    <select name="category" class="form-control" style="width: auto; padding: 6px 12px;" onchange="this.form.submit()">
+      <option value="All" {% if selected_category == 'All' %}selected{% endif %}>All Categories</option>
+      <option value="Food" {% if selected_category == 'Food' %}selected{% endif %}>Food</option>
+      <option value="Water" {% if selected_category == 'Water' %}selected{% endif %}>Water</option>
+      <option value="Medicines" {% if selected_category == 'Medicines' %}selected{% endif %}>Medicines</option>
+      <option value="Clothes" {% if selected_category == 'Clothes' %}selected{% endif %}>Clothes</option>
+      <option value="Blankets" {% if selected_category == 'Blankets' %}selected{% endif %}>Blankets</option>
+      <option value="Shelter/Tools" {% if selected_category == 'Shelter/Tools' %}selected{% endif %}>Shelter/Tools</option>
+    </select>
+
+    <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+    {% if search_query or selected_category != 'All' %}
+      <a href="{{ url_for('inventory') }}" class="btn btn-secondary btn-sm">Reset</a>
+    {% endif %}
+  </form>
+
+  <div class="search-box">
+    <span>⚡</span>
+    <input type="text" id="clientTableSearch" placeholder="Quick client-side filter...">
+  </div>
+</div>
+
+<!-- Inventory Table Card -->
+<div class="panel-card">
+  <div class="panel-header">
+    <h2 class="panel-title">
+      <span>📋</span> Stock Supplies Directory
+    </h2>
+    <span style="font-size: 13px; color: var(--text-muted);">Showing {{ items | length }} items</span>
+  </div>
+  <div class="table-responsive">
+    <table class="custom-table filterable-table">
+      <thead>
+        <tr>
+          <th>Item Description</th>
+          <th>Category</th>
+          <th>Current Stock</th>
+          <th>Safety Buffer</th>
+          <th>Storage Location</th>
+          <th>Stock Status</th>
+          <th>Last Updated</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            <strong style="color: #ffffff; font-size: 14px;">{{ item.item_name }}</strong>
+            <div style="font-size: 12px; color: var(--text-dim);">Unit: {{ item.unit }}</div>
+          </td>
+          <td>
+            <span class="category-pill">{{ item.category }}</span>
+          </td>
+          <td>
+            <span style="font-size: 15px; font-weight: 700; color: #ffffff;">{{ "{:,}".format(item.quantity) }}</span>
+            <span style="font-size: 12px; color: var(--text-muted);">{{ item.unit }}</span>
+          </td>
+          <td>{{ item.threshold }} {{ item.unit }}</td>
+          <td>
+            <span style="color: var(--text-muted); font-size: 13px;">📍 {{ item.storage_location }}</span>
+          </td>
+          <td>
+            {% if item.quantity == 0 %}
+              <span class="badge badge-critical">Out of Stock</span>
+            {% elif item.quantity <= item.threshold %}
+              <span class="badge badge-high">Low Stock Alert</span>
+            {% else %}
+              <span class="badge badge-resolved">Healthy Stock</span>
+            {% endif %}
+          </td>
+          <td style="font-size: 12px; color: var(--text-dim);">{{ item.last_updated }}</td>
+          <td style="text-align: right;">
+            <div style="display: inline-flex; gap: 8px;">
+              <button 
+                class="btn btn-secondary btn-sm" 
+                onclick="populateEditInventory(
+                  {{ item.id }},
+                  '{{ item.item_name | replace("'", "\\'") }}',
+                  '{{ item.category }}',
+                  {{ item.quantity }},
+                  '{{ item.unit }}',
+                  {{ item.threshold }},
+                  '{{ item.storage_location | replace("'", "\\'") }}'
+                )"
+                title="Edit Item Details"
+              >
+                ✏️ Edit
+              </button>
+              
+              <form method="POST" action="{{ url_for('delete_inventory', item_id=item.id) }}" onsubmit="return confirm('Are you sure you want to remove {{ item.item_name }} from the inventory?');" style="display: inline;">
+                <button type="submit" class="btn btn-danger btn-sm" title="Delete Item">
+                  🗑️
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="8" style="text-align: center; color: var(--text-dim); padding: 32px;">
+            No inventory supplies match your criteria. Click "Add New Supply Item" to create one.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal 1: Add New Inventory Item -->
+<div class="modal-overlay" id="addInventoryModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>➕ Register New Supply Item</h3>
+      <button class="modal-close" onclick="closeModal('addInventoryModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_inventory') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Supply Item Name *</label>
+          <input type="text" name="item_name" class="form-control" placeholder="e.g. Baby Formula Milk Cans" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <select name="category" class="form-control" required>
+              <option value="Food">Food</option>
+              <option value="Water">Water</option>
+              <option value="Medicines">Medicines</option>
+              <option value="Clothes">Clothes</option>
+              <option value="Blankets">Blankets</option>
+              <option value="Shelter/Tools">Shelter/Tools</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit of Measure *</label>
+            <input type="text" name="unit" class="form-control" placeholder="e.g. Packets, Liters, Kits, Pieces" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Initial Quantity *</label>
+            <input type="number" name="quantity" class="form-control" min="0" value="100" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold Level *</label>
+            <input type="number" name="threshold" class="form-control" min="1" value="50" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Depot Storage Location *</label>
+          <input type="text" name="storage_location" class="form-control" placeholder="e.g. Central Warehouse - Section 3B" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addInventoryModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Supply Item</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Edit Existing Inventory Item -->
+<div class="modal-overlay" id="editInventoryModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Edit Supply Details</h3>
+      <button class="modal-close" onclick="closeModal('editInventoryModal')">&times;</button>
+    </div>
+    <form id="editInventoryForm" method="POST" action="">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Supply Item Name *</label>
+          <input type="text" id="edit_inv_name" name="item_name" class="form-control" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Category *</label>
+            <select id="edit_inv_category" name="category" class="form-control" required>
+              <option value="Food">Food</option>
+              <option value="Water">Water</option>
+              <option value="Medicines">Medicines</option>
+              <option value="Clothes">Clothes</option>
+              <option value="Blankets">Blankets</option>
+              <option value="Shelter/Tools">Shelter/Tools</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unit of Measure *</label>
+            <input type="text" id="edit_inv_unit" name="unit" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Quantity In Stock *</label>
+            <input type="number" id="edit_inv_quantity" name="quantity" class="form-control" min="0" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Low Stock Threshold *</label>
+            <input type="number" id="edit_inv_threshold" name="threshold" class="form-control" min="1" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Storage Location *</label>
+          <input type="text" id="edit_inv_location" name="storage_location" class="form-control" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('editInventoryModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Supply</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
