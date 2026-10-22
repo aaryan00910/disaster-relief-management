@@ -29,3 +29,28 @@ function populateEditInventory(id, name, category, quantity, unit, threshold, lo
     }
 }
 
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+
+    if (!modal) {
+        console.error("Modal not found:", modalId);
+        return;
+    }
+
+    modal.style.display = "flex";
+    modal.classList.add("active");
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+
+    if (!modal) {
+        console.error("Modal not found:", modalId);
+        return;
+    }
+
+    modal.style.display = "none";
+    modal.classList.remove("active");
+}
+
+
